@@ -1,5 +1,4 @@
 import { createBrowserClient } from '@supabase/ssr';
-import type { Database } from '@/lib/types/database';
 
 /**
  * Client Supabase côté navigateur — utilisé dans les Client Components.
@@ -8,7 +7,7 @@ import type { Database } from '@/lib/types/database';
  * jamais par ce fichier.
  */
 export function createClient() {
-  return createBrowserClient<Database>(
+  return createBrowserClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
   );
