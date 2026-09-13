@@ -1,5 +1,4 @@
 import { createClient as createSupabaseClient } from '@supabase/supabase-js';
-import type { Database } from '@/lib/types/database';
 
 /**
  * Client Supabase avec la clé service_role — à utiliser UNIQUEMENT dans des
@@ -8,7 +7,7 @@ import type { Database } from '@/lib/types/database';
  * le personnel (workflow n°17), une opération que la clé anon ne permet pas.
  */
 export function createAdminClient() {
-  return createSupabaseClient<Database>(
+  return createSupabaseClient(
     process.env.NEXT_PUBLIC_SUPABASE_URL!,
     process.env.SUPABASE_SERVICE_ROLE_KEY!,
     { auth: { autoRefreshToken: false, persistSession: false } }
