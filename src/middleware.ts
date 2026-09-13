@@ -2,9 +2,8 @@ import { createServerClient } from '@supabase/ssr';
 import { NextResponse, type NextRequest } from 'next/server';
 
 // Rafraîchit la session Supabase à chaque requête et protège tout ce qui
-// n'est pas /login. Le vrai contrôle d'accès reste porté par RLS côté base —
-// ceci n'est qu'un garde-fou d'expérience utilisateur (éviter d'afficher un
-// écran vide à un utilisateur déconnecté).
+// n'est pas /login ou /setup. Le vrai contrôle d'accès reste porté par RLS
+// côté base — ceci n'est qu'un garde-fou d'expérience utilisateur.
 export async function middleware(request: NextRequest) {
   let response = NextResponse.next({ request });
 
@@ -16,7 +15,7 @@ export async function middleware(request: NextRequest) {
         getAll() {
           return request.cookies.getAll();
         },
-        setAll(cookiesToSet) {
+        setAll(cookiesToSet: { name: string; value: string; options?: any }[]) {
           cookiesToSet.forEach(({ name, value }) => request.cookies.set(name, value));
           response = NextResponse.next({ request });
           cookiesToSet.forEach(({ name, value, options }) => response.cookies.set(name, value, options));
