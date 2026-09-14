@@ -1,15 +1,8 @@
-export const dynamic = 'force-dynamic';
-
 import { createAdminClient } from '@/lib/supabase/admin';
 import { bootstrapSchool } from './actions';
 
-export default async function SetupPage({ searchParams }: { searchParams: { error?: string; done?: string } }) {
+export default async function SetupPage({ searchParams }: { searchParams: { error?: string; done?: string; pwd?: string; email?: string } }) {
   const admin = createAdminClient();
-  // Vérification volontairement large (bypass RLS via service_role) : ce
-  // compte n'existant nulle part avant le tout premier établissement, il
-  // n'y a pas encore de session pour appliquer current_school_id(). On
-  // referme cette page dès qu'un établissement existe, pour ne jamais la
-  // laisser exploitable en production.
   const { count } = await admin.from('schools').select('*', { count: 'exact', head: true });
 
   if ((count ?? 0) > 0 && searchParams?.done !== '1') {
@@ -33,11 +26,19 @@ export default async function SetupPage({ searchParams }: { searchParams: { erro
       <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
         <div className="panel" style={{ width: 460 }}>
           <h1 style={{ fontSize: 18, marginBottom: 8 }}>Établissement créé</h1>
-          <p className="hint">
-            Un e-mail d&apos;invitation vient d&apos;être envoyé au Directeur pour qu&apos;il
-            choisisse son mot de passe. Une fois cela fait, la connexion se fait normalement.
+          <p className="hint" style={{ marginBottom: 14 }}>
+            Voici les identifiants du premier compte Directeur — note-les
+            immédiatement, ils ne seront plus jamais affichés :
           </p>
-          <a href="/login" className="btn primary" style={{ marginTop: 14, display: 'inline-block' }}>Aller à la connexion</a>
+          <div style={{ background: 'var(--bg)', border: '1px solid var(--line)', padding: '12px 14px', marginBottom: 14 }}>
+            <div><strong>E-mail :</strong> {searchParams.email}</div>
+            <div><strong>Mot de passe :</strong> <code style={{ fontSize: 15 }}>{searchParams.pwd}</code></div>
+          </div>
+          <p className="hint" style={{ marginBottom: 14 }}>
+            Connecte-toi avec ces identifiants, puis pense à changer ce mot de passe
+            depuis les paramètres de ton compte dès que possible.
+          </p>
+          <a href="/login" className="btn primary" style={{ display: 'inline-block' }}>Aller à la connexion</a>
         </div>
       </div>
     );
@@ -49,8 +50,7 @@ export default async function SetupPage({ searchParams }: { searchParams: { erro
         <h1 style={{ fontSize: 20, marginBottom: 4 }}>Premier démarrage</h1>
         <div className="hint" style={{ marginBottom: 20 }}>
           Crée l&apos;établissement, le plan comptable, les rôles par défaut et le
-          compte du premier Directeur — remplace les étapes manuelles décrites
-          dans ONBOARDING.md.
+          compte du premier Directeur.
         </div>
 
         {searchParams?.error && (
