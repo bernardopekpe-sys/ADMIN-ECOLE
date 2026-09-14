@@ -3,6 +3,10 @@
 import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+function randomTempPassword() {
+  return `Ecole-${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}!`;
+}
+
 export async function bootstrapSchool(formData: FormData) {
   const admin = createAdminClient();
 
@@ -32,12 +36,12 @@ export async function bootstrapSchool(formData: FormData) {
 
   const { error: rolesError } = await admin.rpc('initialize_default_roles', { p_school_id: school.id });
   if (rolesError) {
-    redirect(`/setup?error=${encodeURIComponent(`Établissement créé mais échec de l'initialisation des rôles : ${rolesError.message}`)}`);
+    redirect(`/setup?error=${encodeURIComponent(`Établissement créé mais échec des rôles : ${rolesError.message}`)}`);
   }
 
   const { error: accountingError } = await admin.rpc('initialize_default_accounting', { p_school_id: school.id });
   if (accountingError) {
-    redirect(`/setup?error=${encodeURIComponent(`Rôles créés mais échec de l'initialisation comptable : ${accountingError.message}`)}`);
+    redirect(`/setup?error=${encodeURIComponent(`Rôles créés mais échec comptabilité : ${accountingError.message}`)}`);
   }
 
   const { data: personnel, error: personnelError } = await admin
@@ -56,12 +60,18 @@ export async function bootstrapSchool(formData: FormData) {
     .single();
 
   if (personnelError || !personnel) {
-    redirect(`/setup?error=${encodeURIComponent(`Échec de la fiche personnel du Directeur : ${personnelError?.message}`)}`);
+    redirect(`/setup?error=${encodeURIComponent(`Échec fiche personnel : ${personnelError?.message}`)}`);
   }
 
-  const { data: authUser, error: authError } = await admin.auth.admin.inviteUserByEmail(director_email);
+  const tempPassword = randomTempPassword();
+  const { data: authUser, error: authError } = await admin.auth.admin.createUser({
+    email: director_email,
+    password: tempPassword,
+    email_confirm: true
+  });
+
   if (authError || !authUser.user) {
-    redirect(`/setup?error=${encodeURIComponent(`Échec de l'invitation par e-mail : ${authError?.message}`)}`);
+    redirect(`/setup?error=${encodeURIComponent(`Échec création du compte : ${authError?.message}`)}`);
   }
 
   const { data: profile, error: profileError } = await admin
@@ -76,7 +86,7 @@ export async function bootstrapSchool(formData: FormData) {
     .single();
 
   if (profileError || !profile) {
-    redirect(`/setup?error=${encodeURIComponent(`Compte invité mais échec du profil : ${profileError?.message}`)}`);
+    redirect(`/setup?error=${encodeURIComponent(`Compte créé mais échec du profil : ${profileError?.message}`)}`);
   }
 
   const { data: directorRole } = await admin
@@ -91,8 +101,8 @@ export async function bootstrapSchool(formData: FormData) {
     .insert({ school_id: school.id, user_profile_id: profile.id, role_id: directorRole?.id });
 
   if (userRoleError) {
-    redirect(`/setup?error=${encodeURIComponent(`Profil créé mais échec de l'attribution du rôle Directeur : ${userRoleError.message}`)}`);
+    redirect(`/setup?error=${encodeURIComponent(`Profil créé mais échec du rôle : ${userRoleError.message}`)}`);
   }
 
-  redirect('/setup?done=1');
+  redirect(`/setup?done=1&pwd=${encodeURIComponent(tempPassword)}&email=${encodeURIComponent(director_email)}`);
 }
