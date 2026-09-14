@@ -1,95 +1,108 @@
+'use server';
+
+import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { bootstrapSchool } from './actions';
 
-export default async function SetupPage({ searchParams }: { searchParams: { error?: string; done?: string; pwd?: string; email?: string } }) {
+function randomTempPassword() {
+  return `Ecole-${Math.random().toString(36).slice(2, 8)}${Date.now().toString(36).slice(-4)}!`;
+}
+
+export async function bootstrapSchool(formData: FormData) {
   const admin = createAdminClient();
-  const { count } = await admin.from('schools').select('*', { count: 'exact', head: true });
 
-  if ((count ?? 0) > 0 && searchParams?.done !== '1') {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-        <div className="panel" style={{ width: 420 }}>
-          <h1 style={{ fontSize: 18, marginBottom: 8 }}>Configuration déjà effectuée</h1>
-          <p className="hint">
-            Un établissement existe déjà sur cette instance. Pour ajouter un nouvel
-            établissement (déploiement multi-établissements distinct), utilisez
-            ONBOARDING.md — cet assistant ne sert que pour le tout premier démarrage.
-          </p>
-          <a href="/login" className="btn primary" style={{ marginTop: 14, display: 'inline-block' }}>Aller à la connexion</a>
-        </div>
-      </div>
-    );
+  const { count, error: countError } = await admin.from('schools').select('*', { count: 'exact', head: true });
+  if (countError) {
+    redirect(`/setup?error=${encodeURIComponent(`Échec du comptage schools : ${countError.message}`)}`);
+  }
+  if ((count ?? 0) > 0) {
+    redirect(`/setup?error=${encodeURIComponent('Un établissement existe déjà — cet assistant ne sert que pour le tout premier démarrage.')}`);
   }
 
-  if (searchParams?.done === '1') {
-    return (
-      <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-        <div className="panel" style={{ width: 460 }}>
-          <h1 style={{ fontSize: 18, marginBottom: 8 }}>Établissement créé</h1>
-          <p className="hint" style={{ marginBottom: 14 }}>
-            Voici les identifiants du premier compte Directeur — note-les
-            immédiatement, ils ne seront plus jamais affichés :
-          </p>
-          <div style={{ background: 'var(--bg)', border: '1px solid var(--line)', padding: '12px 14px', marginBottom: 14 }}>
-            <div><strong>E-mail :</strong> {searchParams.email}</div>
-            <div><strong>Mot de passe :</strong> <code style={{ fontSize: 15 }}>{searchParams.pwd}</code></div>
-          </div>
-          <p className="hint" style={{ marginBottom: 14 }}>
-            Connecte-toi avec ces identifiants, puis pense à changer ce mot de passe
-            depuis les paramètres de ton compte dès que possible.
-          </p>
-          <a href="/login" className="btn primary" style={{ display: 'inline-block' }}>Aller à la connexion</a>
-        </div>
-      </div>
-    );
+  const official_name = String(formData.get('official_name'));
+  const code = String(formData.get('code')).toUpperCase();
+  const director_last_name = String(formData.get('director_last_name'));
+  const director_first_names = String(formData.get('director_first_names'));
+  const director_email = String(formData.get('director_email'));
+
+  const { data: school, error: schoolError } = await admin
+    .from('schools')
+    .insert({ official_name, code, currency: 'XAF', timezone: 'Africa/Libreville' })
+    .select('id')
+    .single();
+
+  if (schoolError || !school) {
+    redirect(`/setup?error=${encodeURIComponent(`Échec insertion schools : ${schoolError?.message}`)}`);
   }
 
-  return (
-    <div style={{ minHeight: '100vh', display: 'flex', alignItems: 'center', justifyContent: 'center', background: 'var(--bg)' }}>
-      <form action={bootstrapSchool} className="panel" style={{ width: 460 }}>
-        <h1 style={{ fontSize: 20, marginBottom: 4 }}>Premier démarrage</h1>
-        <div className="hint" style={{ marginBottom: 20 }}>
-          Crée l&apos;établissement, le plan comptable, les rôles par défaut et le
-          compte du premier Directeur.
-        </div>
+  const { error: rolesError } = await admin.rpc('initialize_default_roles', { p_school_id: school.id });
+  if (rolesError) {
+    redirect(`/setup?error=${encodeURIComponent(`Établissement créé mais échec des rôles : ${rolesError.message}`)}`);
+  }
 
-        {searchParams?.error && (
-          <div className="error-box">{decodeURIComponent(searchParams.error)}</div>
-        )}
+  const { error: accountingError } = await admin.rpc('initialize_default_accounting', { p_school_id: school.id });
+  if (accountingError) {
+    redirect(`/setup?error=${encodeURIComponent(`Rôles créés mais échec comptabilité : ${accountingError.message}`)}`);
+  }
 
-        <h3>Établissement</h3>
-        <div className="form-grid">
-          <div className="f-item">
-            <label htmlFor="official_name">Nom officiel</label>
-            <input id="official_name" name="official_name" required />
-          </div>
-          <div className="f-item">
-            <label htmlFor="code">Code établissement</label>
-            <input id="code" name="code" placeholder="CSM" required />
-            <div className="hint">Utilisé dans la numérotation des reçus, dépenses, etc.</div>
-          </div>
-        </div>
+  const { data: personnel, error: personnelError } = await admin
+    .from('personnel')
+    .insert({
+      school_id: school.id,
+      registration_number: 'DIR-0001',
+      last_name: director_last_name,
+      first_names: director_first_names,
+      gender: 'M',
+      role_function: 'directeur',
+      base_salary: 0,
+      email: director_email
+    })
+    .select('id')
+    .single();
 
-        <h3>Premier compte Directeur</h3>
-        <div className="form-grid">
-          <div className="f-item">
-            <label htmlFor="director_last_name">Nom</label>
-            <input id="director_last_name" name="director_last_name" required />
-          </div>
-          <div className="f-item">
-            <label htmlFor="director_first_names">Prénoms</label>
-            <input id="director_first_names" name="director_first_names" required />
-          </div>
-          <div className="f-item">
-            <label htmlFor="director_email">E-mail</label>
-            <input id="director_email" name="director_email" type="email" required />
-          </div>
-        </div>
+  if (personnelError || !personnel) {
+    redirect(`/setup?error=${encodeURIComponent(`Échec fiche personnel : ${personnelError?.message}`)}`);
+  }
 
-        <button type="submit" className="btn primary" style={{ marginTop: 18, width: '100%' }}>
-          Créer l&apos;établissement
-        </button>
-      </form>
-    </div>
-  );
+  const tempPassword = randomTempPassword();
+  const { data: authUser, error: authError } = await admin.auth.admin.createUser({
+    email: director_email,
+    password: tempPassword,
+    email_confirm: true
+  });
+
+  if (authError || !authUser.user) {
+    redirect(`/setup?error=${encodeURIComponent(`Échec création du compte : ${authError?.message}`)}`);
+  }
+
+  const { data: profile, error: profileError } = await admin
+    .from('user_profiles')
+    .insert({
+      school_id: school.id,
+      auth_user_id: authUser.user.id,
+      personnel_id: personnel.id,
+      full_name: `${director_last_name} ${director_first_names}`
+    })
+    .select('id')
+    .single();
+
+  if (profileError || !profile) {
+    redirect(`/setup?error=${encodeURIComponent(`Compte créé mais échec du profil : ${profileError?.message}`)}`);
+  }
+
+  const { data: directorRole } = await admin
+    .from('roles')
+    .select('id')
+    .eq('school_id', school.id)
+    .eq('name', 'Directeur')
+    .single();
+
+  const { error: userRoleError } = await admin
+    .from('user_roles')
+    .insert({ school_id: school.id, user_profile_id: profile.id, role_id: directorRole?.id });
+
+  if (userRoleError) {
+    redirect(`/setup?error=${encodeURIComponent(`Profil créé mais échec du rôle : ${userRoleError.message}`)}`);
+  }
+
+  redirect(`/setup?done=1&pwd=${encodeURIComponent(tempPassword)}&email=${encodeURIComponent(director_email)}`);
 }
