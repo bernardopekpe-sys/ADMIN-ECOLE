@@ -15,9 +15,9 @@ export default function LoginPage({ searchParams }: { searchParams: { error?: st
         )}
 
         <div className="form-grid full">
-          <div className="f-item">
-            <label htmlFor="email">Adresse e-mail</label>
-            <input id="email" name="email" type="email" required autoComplete="email" />
+                    <div className="f-item">
+            <label htmlFor="identifier">Identifiant (code ou e-mail)</label>
+            <input id="identifier" name="identifier" required autoComplete="username" />
           </div>
                     <div className="f-item">
             <label htmlFor="identifier">Identifiant (code ou e-mail)</label>
