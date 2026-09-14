@@ -4,29 +4,14 @@ import { redirect } from 'next/navigation';
 import { createAdminClient } from '@/lib/supabase/admin';
 
 export async function bootstrapSchool(formData: FormData) {
-  // Diagnostic : on vérifie d'abord que les variables d'environnement sont
-  // bien reçues côté serveur, avant même de tenter quoi que ce soit.
-  const url = process.env.NEXT_PUBLIC_SUPABASE_URL;
-  const serviceKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
-
-  if (!url || !serviceKey) {
-    redirect(`/setup?error=${encodeURIComponent(
-      `DIAGNOSTIC — NEXT_PUBLIC_SUPABASE_URL est ${url ? 'présente (longueur ' + url.length + ')' : 'ABSENTE'}, SUPABASE_SERVICE_ROLE_KEY est ${serviceKey ? 'présente (longueur ' + serviceKey.length + ')' : 'ABSENTE'}.`
-    )}`);
-  }
-
   const admin = createAdminClient();
 
-  try {
-    const { count, error: countError } = await admin.from('schools').select('*', { count: 'exact', head: true });
-    if (countError) {
-      redirect(`/setup?error=${encodeURIComponent(`DIAGNOSTIC — Échec du comptage schools : ${countError.message} (code: ${(countError as any).code ?? 'n/a'})`)}`);
-    }
-    if ((count ?? 0) > 0) {
-      redirect(`/setup?error=${encodeURIComponent('Un établissement existe déjà — cet assistant ne sert que pour le tout premier démarrage.')}`);
-    }
-  } catch (e: any) {
-    redirect(`/setup?error=${encodeURIComponent(`DIAGNOSTIC — Exception au comptage : ${e?.message ?? String(e)}`)}`);
+  const { count, error: countError } = await admin.from('schools').select('*', { count: 'exact', head: true });
+  if (countError) {
+    redirect(`/setup?error=${encodeURIComponent(`Échec du comptage schools : ${countError.message}`)}`);
+  }
+  if ((count ?? 0) > 0) {
+    redirect(`/setup?error=${encodeURIComponent('Un établissement existe déjà — cet assistant ne sert que pour le tout premier démarrage.')}`);
   }
 
   const official_name = String(formData.get('official_name'));
@@ -35,24 +20,14 @@ export async function bootstrapSchool(formData: FormData) {
   const director_first_names = String(formData.get('director_first_names'));
   const director_email = String(formData.get('director_email'));
 
-  let school: { id: string } | null = null;
-  try {
-    const { data, error: schoolError } = await admin
-      .from('schools')
-      .insert({ official_name, code, currency: 'XAF', timezone: 'Africa/Libreville' })
-      .select('id')
-      .single();
+  const { data: school, error: schoolError } = await admin
+    .from('schools')
+    .insert({ official_name, code, currency: 'XAF', timezone: 'Africa/Libreville' })
+    .select('id')
+    .single();
 
-    if (schoolError || !data) {
-      redirect(`/setup?error=${encodeURIComponent(`DIAGNOSTIC — Échec insertion schools : ${schoolError?.message} (code: ${(schoolError as any)?.code ?? 'n/a'})`)}`);
-    }
-    school = data;
-  } catch (e: any) {
-    redirect(`/setup?error=${encodeURIComponent(`DIAGNOSTIC — Exception à l'insertion schools : ${e?.message ?? String(e)}`)}`);
-  }
-
-  if (!school) {
-    redirect(`/setup?error=${encodeURIComponent('DIAGNOSTIC — school est null après insertion, sans erreur explicite.')}`);
+  if (schoolError || !school) {
+    redirect(`/setup?error=${encodeURIComponent(`Échec insertion schools : ${schoolError?.message}`)}`);
   }
 
   const { error: rolesError } = await admin.rpc('initialize_default_roles', { p_school_id: school.id });
