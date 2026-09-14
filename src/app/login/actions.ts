@@ -6,8 +6,9 @@ import { createClient } from '@/lib/supabase/server';
 export async function login(formData: FormData) {
   const supabase = createClient();
 
-  const email = String(formData.get('email') ?? '');
+  const identifier = String(formData.get('identifier') ?? '');
   const password = String(formData.get('password') ?? '');
+  const email = identifier.includes('@') ? identifier : `${identifier.toLowerCase()}@login.internal`;
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
 
