@@ -19,9 +19,9 @@ export default function LoginPage({ searchParams }: { searchParams: { error?: st
             <label htmlFor="email">Adresse e-mail</label>
             <input id="email" name="email" type="email" required autoComplete="email" />
           </div>
-          <div className="f-item">
-            <label htmlFor="password">Mot de passe</label>
-            <input id="password" name="password" type="password" required autoComplete="current-password" />
+                    <div className="f-item">
+            <label htmlFor="identifier">Identifiant (code ou e-mail)</label>
+            <input id="identifier" name="identifier" required autoComplete="username" />
           </div>
         </div>
 
