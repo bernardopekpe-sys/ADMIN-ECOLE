@@ -15,13 +15,13 @@ export default function LoginPage({ searchParams }: { searchParams: { error?: st
         )}
 
         <div className="form-grid full">
-                    <div className="f-item">
+          <div className="f-item">
             <label htmlFor="identifier">Identifiant (code ou e-mail)</label>
             <input id="identifier" name="identifier" required autoComplete="username" />
           </div>
-                    <div className="f-item">
-            <label htmlFor="identifier">Identifiant (code ou e-mail)</label>
-            <input id="identifier" name="identifier" required autoComplete="username" />
+          <div className="f-item">
+            <label htmlFor="password">Mot de passe</label>
+            <input id="password" name="password" type="password" required autoComplete="current-password" />
           </div>
         </div>
 
