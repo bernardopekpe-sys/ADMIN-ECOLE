@@ -37,4 +37,4 @@ export default function NouvelEtablissementPage({ searchParams }: { searchParams
       </form>
     </div>
   );
-}src/app/error.tsx
+}
