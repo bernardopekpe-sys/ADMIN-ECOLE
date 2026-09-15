@@ -60,8 +60,8 @@ export default async function DashboardLayout({ children }: { children: React.Re
             }}>Déconnexion</button>
           </form>
         </div>
-        <nav style={{
-          display: 'flex', gap: 2, overflowX: 'auto', padding: '0 12px 8px',
+                <nav style={{
+          display: 'flex', flexWrap: 'wrap', gap: 4, padding: '8px 12px',
           borderTop: '1px solid rgba(255,255,255,.12)'
         }}>
           {NAV.map((item) => (
