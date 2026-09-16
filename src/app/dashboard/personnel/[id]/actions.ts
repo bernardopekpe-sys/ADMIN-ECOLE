@@ -1,43 +1,49 @@
 'use server';
 
+import { redirect } from 'next/navigation';
 import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 
+function randomPin() {
+  return Math.floor(1000 + Math.random() * 9000).toString();
+}
+
 export async function createUserAccount(formData: FormData) {
   const supabase = createClient();
-  const { data: school } = await supabase.from('schools').select('id').single();
+  const { data: school } = await supabase.from('schools').select('id, code').single();
   if (!school) throw new Error('Établissement introuvable pour ce compte.');
 
   const personnel_id = String(formData.get('personnel_id'));
-  const email = String(formData.get('email'));
+  const login_code = String(formData.get('login_code')).toUpperCase();
   const role_id = String(formData.get('role_id'));
 
   const { data: person } = await supabase.from('personnel').select('last_name, first_names').eq('id', personnel_id).single();
   if (!person) throw new Error('Fiche personnel introuvable.');
 
-  // 1 personnel -> 0..1 compte : contrôlé par la contrainte unique sur
-  // user_profiles.personnel_id, mais on vérifie ici pour un message clair.
   const { data: existing } = await supabase.from('user_profiles').select('id').eq('personnel_id', personnel_id).maybeSingle();
   if (existing) throw new Error('Ce membre du personnel a déjà un compte utilisateur.');
 
-  // Création Supabase Auth : nécessite la clé service_role (admin), jamais
-  // exposée au client — voir src/lib/supabase/admin.ts. inviteUserByEmail
-  // envoie un e-mail avec un lien pour que l'utilisateur choisisse lui-même
-  // son mot de passe — évite de générer un mot de passe temporaire qui ne
-  // serait communiqué nulle part (limite corrigée par rapport à la version précédente).
   const admin = createAdminClient();
-  const { data: authUser, error: authError } = await admin.auth.admin.inviteUserByEmail(email);
+  const pin = randomPin();
+  const fullLoginCode = `${school.code}-${login_code}`;
+
+  const { data: authUser, error: authError } = await admin.auth.admin.createUser({
+    email: `${fullLoginCode.toLowerCase()}@login.internal`,
+    password: pin,
+    email_confirm: true
+  });
 
   if (authError || !authUser.user) {
-    throw new Error(`Impossible d'inviter cet utilisateur : ${authError?.message}`);
+    throw new Error(`Impossible de créer le compte : ${authError?.message}`);
   }
 
   const { data: profile, error: profileError } = await supabase.from('user_profiles').insert({
     school_id: school.id,
     auth_user_id: authUser.user.id,
     personnel_id,
-    full_name: `${person.last_name} ${person.first_names}`
+    full_name: `${person.last_name} ${person.first_names}`,
+    login_code: fullLoginCode
   }).select('id').single();
 
   if (profileError) {
@@ -51,7 +57,7 @@ export async function createUserAccount(formData: FormData) {
     throw new Error(`Profil créé mais échec de l'attribution du rôle : ${roleError.message}`);
   }
 
-  revalidatePath(`/dashboard/personnel/${personnel_id}`);
+  redirect(`/dashboard/personnel/${personnel_id}?code=${encodeURIComponent(fullLoginCode)}&pin=${pin}`);
 }
 
 export async function createAdvance(formData: FormData) {
@@ -103,8 +109,6 @@ export async function createBonus(formData: FormData) {
   const personnel_id = String(formData.get('personnel_id'));
   const label = String(formData.get('label'));
 
-  // Réutilise (ou crée) un salary_element du même nom, pour rester cohérent
-  // avec le paramétrage (règle métier : types de primes paramétrables).
   let { data: element } = await supabase.from('salary_elements').select('id').eq('school_id', school.id).eq('name', label).maybeSingle();
   if (!element) {
     const { data: created, error: createError } = await supabase.from('salary_elements').insert({
