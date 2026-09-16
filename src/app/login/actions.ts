@@ -10,10 +10,12 @@ export async function login(formData: FormData) {
   const password = String(formData.get('password') ?? '');
   const email = identifier.includes('@') ? identifier : `${identifier.toLowerCase()}@login.internal`;
 
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
   if (error) {
-    redirect('/login?error=1');
+    redirect(`/login?error=${encodeURIComponent(
+      `DIAGNOSTIC — message: "${error.message}" | status: ${error.status} | name: ${error.name}`
+    )}`);
   }
 
   redirect('/dashboard');
