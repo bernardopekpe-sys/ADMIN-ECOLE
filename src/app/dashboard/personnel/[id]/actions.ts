@@ -10,54 +10,52 @@ function randomPin() {
 }
 
 export async function createUserAccount(formData: FormData) {
-  const supabase = createClient();
-  const { data: school } = await supabase.from('schools').select('id, code').single();
-  if (!school) throw new Error('Établissement introuvable pour ce compte.');
-
   const personnel_id = String(formData.get('personnel_id'));
-  const login_code = String(formData.get('login_code')).toUpperCase();
-  const role_id = String(formData.get('role_id'));
 
-  const { data: person } = await supabase.from('personnel').select('last_name, first_names').eq('id', personnel_id).single();
-  if (!person) throw new Error('Fiche personnel introuvable.');
+  try {
+    const supabase = createClient();
+    const { data: school } = await supabase.from('schools').select('id, code').single();
+    if (!school) throw new Error('Établissement introuvable pour ce compte.');
 
-  const { data: existing } = await supabase.from('user_profiles').select('id').eq('personnel_id', personnel_id).maybeSingle();
-  if (existing) throw new Error('Ce membre du personnel a déjà un compte utilisateur.');
+    const login_code = String(formData.get('login_code')).toUpperCase();
+    const role_id = String(formData.get('role_id'));
 
-  const admin = createAdminClient();
-  const pin = randomPin();
-  const fullLoginCode = `${school.code}-${login_code}`;
+    const { data: person } = await supabase.from('personnel').select('last_name, first_names').eq('id', personnel_id).single();
+    if (!person) throw new Error('Fiche personnel introuvable.');
 
-  const { data: authUser, error: authError } = await admin.auth.admin.createUser({
-    email: `${fullLoginCode.toLowerCase()}@login.internal`,
-    password: pin,
-    email_confirm: true
-  });
+    const { data: existing } = await supabase.from('user_profiles').select('id').eq('personnel_id', personnel_id).maybeSingle();
+    if (existing) throw new Error('Ce membre du personnel a déjà un compte utilisateur.');
 
-  if (authError || !authUser.user) {
-    throw new Error(`Impossible de créer le compte : ${authError?.message}`);
+    const admin = createAdminClient();
+    const pin = randomPin();
+    const fullLoginCode = `${school.code}-${login_code}`;
+
+    const { data: authUser, error: authError } = await admin.auth.admin.createUser({
+      email: `${fullLoginCode.toLowerCase()}@login.internal`,
+      password: pin,
+      email_confirm: true
+    });
+    if (authError || !authUser.user) throw new Error(`Échec création compte Auth : ${authError?.message}`);
+
+    const { data: profile, error: profileError } = await supabase.from('user_profiles').insert({
+      school_id: school.id,
+      auth_user_id: authUser.user.id,
+      personnel_id,
+      full_name: `${person.last_name} ${person.first_names}`,
+      login_code: fullLoginCode
+    }).select('id').single();
+    if (profileError || !profile) throw new Error(`Échec création profil : ${profileError?.message}`);
+
+    const { error: roleError } = await supabase.from('user_roles').insert({
+      school_id: school.id, user_profile_id: profile.id, role_id
+    });
+    if (roleError) throw new Error(`Échec attribution du rôle : ${roleError.message}`);
+
+    redirect(`/dashboard/personnel/${personnel_id}?code=${encodeURIComponent(fullLoginCode)}&pin=${pin}`);
+  } catch (e: any) {
+    if (e?.digest?.startsWith('NEXT_REDIRECT')) throw e;
+    redirect(`/dashboard/personnel/${personnel_id}?diag=${encodeURIComponent(e?.message ?? String(e))}`);
   }
-
-  const { data: profile, error: profileError } = await supabase.from('user_profiles').insert({
-    school_id: school.id,
-    auth_user_id: authUser.user.id,
-    personnel_id,
-    full_name: `${person.last_name} ${person.first_names}`,
-    login_code: fullLoginCode
-  }).select('id').single();
-
-  if (profileError) {
-    throw new Error(`Compte Auth créé mais échec du profil : ${profileError.message}`);
-  }
-
-  const { error: roleError } = await supabase.from('user_roles').insert({
-    school_id: school.id, user_profile_id: profile.id, role_id
-  });
-  if (roleError) {
-    throw new Error(`Profil créé mais échec de l'attribution du rôle : ${roleError.message}`);
-  }
-
-  redirect(`/dashboard/personnel/${personnel_id}?code=${encodeURIComponent(fullLoginCode)}&pin=${pin}`);
 }
 
 export async function createAdvance(formData: FormData) {
