@@ -10,8 +10,8 @@ export default function LoginPage({ searchParams }: { searchParams: { error?: st
         <h1 style={{ fontSize: 20, marginBottom: 4 }}>ERP Scolaire</h1>
         <div className="hint" style={{ marginBottom: 20 }}>Connexion à votre établissement</div>
 
-        {searchParams?.error && (
-          <div className="error-box">Identifiants incorrects. Veuillez réessayer.</div>
+              {searchParams?.error && (
+          <div className="error-box">{decodeURIComponent(searchParams.error)}</div>
         )}
 
         <div className="form-grid full">
