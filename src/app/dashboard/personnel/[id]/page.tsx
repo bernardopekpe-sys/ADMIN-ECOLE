@@ -5,7 +5,7 @@ export default async function FichePersonnelPage({
   params, searchParams
 }: {
   params: { id: string };
-  searchParams: { code?: string; pin?: string };
+  searchParams: { code?: string; pin?: string; diag?: string };
 }) {
   const supabase = createClient();
 
@@ -50,6 +50,11 @@ export default async function FichePersonnelPage({
           </table>
 
           <h3>Compte utilisateur</h3>
+
+          {searchParams?.diag && (
+            <div className="error-box">DIAGNOSTIC — {searchParams.diag}</div>
+          )}
+
           {userProfile ? (
             <div className="hint">Compte actif : {userProfile.full_name} — Code : {userProfile.login_code ?? '—'}</div>
           ) : searchParams?.pin ? (
