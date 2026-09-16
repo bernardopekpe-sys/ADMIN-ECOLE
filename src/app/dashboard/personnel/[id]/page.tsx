@@ -1,11 +1,16 @@
 import { createClient } from '@/lib/supabase/server';
 import { createUserAccount, createAdvance, createLoan, createBonus } from './actions';
 
-export default async function FichePersonnelPage({ params }: { params: { id: string } }) {
+export default async function FichePersonnelPage({
+  params, searchParams
+}: {
+  params: { id: string };
+  searchParams: { code?: string; pin?: string };
+}) {
   const supabase = createClient();
 
   const { data: person } = await supabase.from('personnel').select('*').eq('id', params.id).single();
-  const { data: userProfile } = await supabase.from('user_profiles').select('id, full_name').eq('personnel_id', params.id).maybeSingle();
+  const { data: userProfile } = await supabase.from('user_profiles').select('id, full_name, login_code').eq('personnel_id', params.id).maybeSingle();
   const { data: salaryHistory } = await supabase.from('personnel_salary_history').select('base_salary, effective_from, effective_to').eq('personnel_id', params.id).order('effective_from', { ascending: false });
   const { data: advances } = await supabase.from('advances').select('id, amount, reason, status, advance_date').eq('personnel_id', params.id).order('advance_date', { ascending: false });
   const { data: loans } = await supabase.from('personnel_loans').select('id, principal_amount, monthly_installment, status, loan_date').eq('personnel_id', params.id).order('loan_date', { ascending: false });
@@ -46,18 +51,26 @@ export default async function FichePersonnelPage({ params }: { params: { id: str
 
           <h3>Compte utilisateur</h3>
           {userProfile ? (
-            <div className="hint">Compte actif : {userProfile.full_name}</div>
+            <div className="hint">Compte actif : {userProfile.full_name} — Code : {userProfile.login_code ?? '—'}</div>
+          ) : searchParams?.pin ? (
+            <div style={{ background: 'var(--accent-soft)', border: '1px solid #E7C892', padding: '12px 14px' }}>
+              <strong>Note ces identifiants — affichés une seule fois :</strong>
+              <div>Code : {searchParams.code}</div>
+              <div>PIN : {searchParams.pin}</div>
+            </div>
           ) : (
             <form action={createUserAccount} className="form-grid">
               <input type="hidden" name="personnel_id" value={person.id} />
-              <div className="f-item"><label htmlFor="email">E-mail</label><input id="email" name="email" type="email" required /></div>
+              <div className="f-item">
+                <label htmlFor="login_code">Code court (ex: SEC-01)</label>
+                <input id="login_code" name="login_code" placeholder="SEC-01" required />
+              </div>
               <div className="f-item"><label htmlFor="role_id">Rôle</label>
                 <select id="role_id" name="role_id" required>
                   {roles?.map((r) => <option key={r.id} value={r.id}>{r.name}</option>)}
                 </select>
               </div>
               <button type="submit" className="btn ghost">Créer le compte</button>
-              <div className="hint">Un mot de passe temporaire est généré ; l&apos;utilisateur devra le changer à la première connexion.</div>
             </form>
           )}
         </div>
