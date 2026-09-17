@@ -73,14 +73,14 @@ export default async function FichePersonnelPage({
               <div className="error-box">DIAGNOSTIC — {searchParams.diag}</div>
             )}
 
-            {userProfile ? (
-              <div className="hint">Compte actif : {userProfile.full_name} — Code : {userProfile.login_code ?? '—'}</div>
-            ) : searchParams?.pin ? (
+            {searchParams?.pin ? (
               <div style={{ background: 'var(--accent-soft)', border: '1px solid #E7C892', padding: '12px 14px' }}>
                 <strong>Note ces identifiants — affichés une seule fois :</strong>
                 <div>Code : {searchParams.code}</div>
                 <div>PIN : {searchParams.pin}</div>
               </div>
+            ) : userProfile ? (
+              <div className="hint">Compte actif : {userProfile.full_name} — Code : {userProfile.login_code ?? '—'}</div>
             ) : (
               <form action={createUserAccount} className="form-grid">
                 <input type="hidden" name="personnel_id" value={person.id} />
