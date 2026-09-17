@@ -58,6 +58,27 @@ export async function createUserAccount(formData: FormData) {
   }
 }
 
+export async function resetPin(formData: FormData) {
+  const personnel_id = String(formData.get('personnel_id'));
+
+  try {
+    const supabase = createClient();
+    const { data: profile } = await supabase.from('user_profiles').select('auth_user_id, login_code').eq('personnel_id', personnel_id).single();
+    if (!profile) throw new Error('Aucun compte à réinitialiser pour ce membre.');
+
+    const admin = createAdminClient();
+    const pin = randomPin();
+
+    const { error } = await admin.auth.admin.updateUserById(profile.auth_user_id, { password: pin });
+    if (error) throw new Error(`Échec réinitialisation : ${error.message}`);
+
+    redirect(`/dashboard/personnel/${personnel_id}?code=${encodeURIComponent(profile.login_code ?? '')}&pin=${pin}&reset=1`);
+  } catch (e: any) {
+    if (e?.digest?.startsWith('NEXT_REDIRECT')) throw e;
+    redirect(`/dashboard/personnel/${personnel_id}?diag=${encodeURIComponent(e?.message ?? String(e))}`);
+  }
+}
+
 export async function createAdvance(formData: FormData) {
   const supabase = createClient();
   const { data: school } = await supabase.from('schools').select('id').single();
