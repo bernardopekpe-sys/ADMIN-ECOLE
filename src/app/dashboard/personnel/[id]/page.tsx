@@ -1,11 +1,11 @@
 import { createClient } from '@/lib/supabase/server';
-import { createUserAccount, createAdvance, createLoan, createBonus } from './actions';
+import { createUserAccount, createAdvance, createLoan, createBonus, resetPin } from './actions';
 
 export default async function FichePersonnelPage({
   params, searchParams
 }: {
   params: { id: string };
-  searchParams: { code?: string; pin?: string; diag?: string };
+  searchParams: { code?: string; pin?: string; diag?: string; reset?: string };
 }) {
   try {
     const supabase = createClient();
@@ -80,7 +80,15 @@ export default async function FichePersonnelPage({
                 <div>PIN : {searchParams.pin}</div>
               </div>
             ) : userProfile ? (
-              <div className="hint">Compte actif : {userProfile.full_name} — Code : {userProfile.login_code ?? '—'}</div>
+              <div>
+                <div className="hint" style={{ marginBottom: 10 }}>
+                  Compte actif : {userProfile.full_name} — Code : {userProfile.login_code ?? '—'}
+                </div>
+                <form action={resetPin}>
+                  <input type="hidden" name="personnel_id" value={person.id} />
+                  <button type="submit" className="btn ghost">Réinitialiser le PIN</button>
+                </form>
+              </div>
             ) : (
               <form action={createUserAccount} className="form-grid">
                 <input type="hidden" name="personnel_id" value={person.id} />
