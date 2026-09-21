@@ -46,8 +46,6 @@ export async function uploadDocument(formData: FormData) {
 
   if (!file || file.size === 0) throw new Error('Aucun fichier sélectionné.');
 
-  // Chemin school_id en tête : requis par les policies storage.objects
-  // posées dans 0011_storage_documents.sql pour l'isolation multi-tenant.
   const path = `${school.id}/students/${student_id}/${Date.now()}-${file.name}`;
 
   const { error: uploadError } = await supabase.storage.from('documents').upload(path, file, {
@@ -65,5 +63,20 @@ export async function uploadDocument(formData: FormData) {
   });
 
   if (error) throw new Error(`Fichier téléversé mais échec de l'enregistrement : ${error.message}`);
+  revalidatePath(`/dashboard/eleves/${student_id}`);
+}
+
+// Change le statut d'une inscription (transfert, exclusion, annulation...).
+// Ne supprime jamais la ligne — l'historique complet reste visible, avec
+// la trace de chaque statut par lequel l'inscription est passée.
+export async function changeEnrollmentStatus(formData: FormData) {
+  const supabase = createClient();
+  const student_id = String(formData.get('student_id'));
+  const enrollment_id = String(formData.get('enrollment_id'));
+  const status = String(formData.get('status'));
+
+  const { error } = await supabase.from('enrollments').update({ status }).eq('id', enrollment_id);
+  if (error) throw new Error(`Impossible de changer le statut de l'inscription : ${error.message}`);
+
   revalidatePath(`/dashboard/eleves/${student_id}`);
 }
