@@ -1,6 +1,6 @@
 import Link from 'next/link';
 import { createClient } from '@/lib/supabase/server';
-import { applyDiscount, uploadDocument } from './actions';
+import { applyDiscount, uploadDocument, changeEnrollmentStatus } from './actions';
 
 export default async function FicheElevePage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -13,7 +13,7 @@ export default async function FicheElevePage({ params }: { params: { id: string 
 
   const { data: enrollments } = await supabase
     .from('enrollments')
-    .select('id, status, enrollment_date, academic_years(label), classes(name)')
+    .select('id, status, enrollment_date, created_at, academic_years(label), classes(name)')
     .eq('student_id', params.id)
     .order('enrollment_date', { ascending: false });
 
@@ -47,9 +47,12 @@ export default async function FicheElevePage({ params }: { params: { id: string 
           <h1>{student.last_name} {student.first_names}</h1>
           <div className="sub">Matricule {student.registration_number}</div>
         </div>
-        <Link href={`/dashboard/paiements/nouveau?student_id=${student.id}`} className="btn primary">
-          Enregistrer un paiement
-        </Link>
+        <div style={{ display: 'flex', gap: 10 }}>
+          <Link href={`/dashboard/eleves/${student.id}/modifier`} className="btn ghost">Modifier la fiche</Link>
+          <Link href={`/dashboard/paiements/nouveau?student_id=${student.id}`} className="btn primary">
+            Enregistrer un paiement
+          </Link>
+        </div>
       </div>
 
       <div className="grid-2">
@@ -61,23 +64,40 @@ export default async function FicheElevePage({ params }: { params: { id: string 
               <tr><td>Date de naissance</td><td>{student.birth_date ?? '—'}</td></tr>
               <tr><td>Lieu de naissance</td><td>{student.birth_place ?? '—'}</td></tr>
               <tr><td>Nationalité</td><td>{student.nationality ?? '—'}</td></tr>
+              <tr><td>Adresse</td><td>{student.address ?? '—'}</td></tr>
               <tr><td>Statut</td><td><span className="badge paid">{student.status}</span></td></tr>
             </tbody>
           </table>
 
           <h3>Historique des inscriptions</h3>
           <table className="data">
-            <thead><tr><th>Année</th><th>Classe</th><th>Statut</th></tr></thead>
+            <thead><tr><th>Année</th><th>Classe</th><th>Statut</th><th>Date / heure</th><th></th></tr></thead>
             <tbody>
               {enrollments?.map((e: any) => (
                 <tr key={e.id}>
                   <td>{e.academic_years?.label}</td>
                   <td>{e.classes?.name}</td>
-                  <td>{e.status}</td>
+                  <td><span className="badge pending">{e.status}</span></td>
+                  <td style={{ fontSize: 11 }}>{new Date(e.created_at).toLocaleString('fr-FR')}</td>
+                  <td>
+                    <form action={changeEnrollmentStatus} style={{ display: 'flex', gap: 6 }}>
+                      <input type="hidden" name="enrollment_id" value={e.id} />
+                      <input type="hidden" name="student_id" value={student.id} />
+                      <select name="status" defaultValue={e.status} style={{ fontSize: 12 }}>
+                        <option value="inscrit">Inscrit</option>
+                        <option value="en_attente">En attente</option>
+                        <option value="transfere">Transféré</option>
+                        <option value="exclu">Exclu</option>
+                        <option value="annule">Annulé</option>
+                        <option value="termine">Terminé</option>
+                      </select>
+                      <button type="submit" className="btn ghost">Changer</button>
+                    </form>
+                  </td>
                 </tr>
               ))}
               {!enrollments?.length && (
-                <tr><td colSpan={3}>
+                <tr><td colSpan={5}>
                   Aucune inscription. <Link href={`/dashboard/inscriptions/nouveau?student_id=${student.id}`}>Inscrire cet élève →</Link>
                 </td></tr>
               )}
@@ -171,11 +191,6 @@ export default async function FicheElevePage({ params }: { params: { id: string 
           </div>
           <button type="submit" className="btn ghost">Téléverser</button>
         </form>
-        <div className="hint">
-          Nécessite qu&apos;un bucket Storage privé « documents » existe (créé
-          automatiquement par la migration 0011 — voir ONBOARDING.md si le
-          téléversement échoue).
-        </div>
       </div>
     </div>
   );
