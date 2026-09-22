@@ -38,12 +38,13 @@ export default async function FichePersonnelPage({
 
     return (
       <div className="page">
-        <div className="page-head">
-          <div>
-            <h1>{person.last_name} {person.first_names}</h1>
-            <div className="sub">{person.role_function} — Matricule {person.registration_number}</div>
-          </div>
+             <div className="page-head">
+        <div>
+          <h1>{person.last_name} {person.first_names}</h1>
+          <div className="sub">{person.role_function} — Matricule {person.registration_number}</div>
         </div>
+        <a href={`/dashboard/personnel/${person.id}/modifier`} className="btn ghost">Modifier / Désactiver</a>
+      </div>
 
         <div className="grid-2">
           <div className="panel">
