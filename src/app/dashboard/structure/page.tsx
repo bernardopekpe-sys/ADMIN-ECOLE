@@ -73,7 +73,8 @@ export default async function StructurePage() {
                 <tr key={c.id}>
                   <td>{c.name}</td>
                   <td>{c.levels?.name}</td>
-                  <td className="num">{c.capacity ?? '—'} places</td>
+                              <td className="num">{c.capacity ?? '—'} places</td>
+                  <td><a href={`/dashboard/structure/classe/${c.id}`}>Liste →</a></td>
                   <td><a href={`/dashboard/structure/classe/${c.id}`}>Liste →</a></td>
                 </tr>
               ))}
