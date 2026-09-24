@@ -83,7 +83,8 @@ export default async function ElevesPage({ searchParams }: { searchParams: { q?:
               {filteredClasses?.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}
             </select>
           </div>
-                   <button type="submit" className="btn ghost">Filtrer</button>
+                            <button type="submit" className="btn ghost">Filtrer</button>
+          <a href={`/dashboard/eleves/liste-imprimable?cycle_id=${searchParams?.cycle_id ?? ''}&level_id=${searchParams?.level_id ?? ''}&class_id=${searchParams?.class_id ?? ''}`} className="btn ghost">Imprimer cette liste</a>
           <a href={`/dashboard/eleves/liste-imprimable?cycle_id=${searchParams?.cycle_id ?? ''}&level_id=${searchParams?.level_id ?? ''}&class_id=${searchParams?.class_id ?? ''}`} className="btn ghost">Imprimer cette liste</a>
         </form>
 
