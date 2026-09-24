@@ -74,6 +74,7 @@ export default async function StructurePage() {
                   <td>{c.name}</td>
                   <td>{c.levels?.name}</td>
                   <td className="num">{c.capacity ?? '—'} places</td>
+                  <td><a href={`/dashboard/structure/classe/${c.id}`}>Liste →</a></td>
                 </tr>
               ))}
               {!classes?.length && <tr><td>Aucune classe créée pour cette année.</td></tr>}
