@@ -1,5 +1,6 @@
 import { createClient } from '@/lib/supabase/server';
 import PrintButton from './print-button';
+import { cancelPayment } from '../actions';
 
 export default async function RecuPage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -22,6 +23,12 @@ export default async function RecuPage({ params }: { params: { id: string } }) {
   const school = (payment as any).schools;
   const student = (payment as any).students;
 
+  const { data: cancellation } = await supabase
+    .from('payment_cancellations')
+    .select('reason, created_at')
+    .eq('payment_id', params.id)
+    .maybeSingle();
+
   return (
     <div className="page">
       <div className="page-head">
@@ -31,6 +38,12 @@ export default async function RecuPage({ params }: { params: { id: string } }) {
         </div>
         <PrintButton />
       </div>
+
+      {payment.status === 'cancelled' && (
+        <div className="error-box">
+          Paiement annulé{cancellation ? ` — motif : ${cancellation.reason}` : ''}
+        </div>
+      )}
 
       <div className="panel" style={{ maxWidth: 480 }} id="receipt-print-area">
         <div style={{ display: 'flex', justifyContent: 'space-between', borderBottom: '2px solid var(--primary)', paddingBottom: 10, marginBottom: 12 }}>
@@ -58,6 +71,24 @@ export default async function RecuPage({ params }: { params: { id: string } }) {
         </div>
         <div className="hint" style={{ marginTop: 8, fontStyle: 'italic' }}>{receipt?.amount_in_words}</div>
       </div>
+
+      {payment.status === 'validated' && (
+        <div className="panel" style={{ maxWidth: 480, marginTop: 16 }}>
+          <h2>Annuler ce paiement</h2>
+          <div className="hint" style={{ marginBottom: 10 }}>
+            Génère une écriture comptable inverse et retire le montant de l&apos;échéancier de l&apos;élève.
+            Le reçu original reste visible dans l&apos;historique, jamais supprimé.
+          </div>
+          <form action={cancelPayment}>
+            <input type="hidden" name="payment_id" value={payment.id} />
+            <div className="f-item" style={{ marginBottom: 10 }}>
+              <label htmlFor="reason">Motif de l&apos;annulation</label>
+              <input id="reason" name="reason" required />
+            </div>
+            <button type="submit" className="btn danger">Annuler le paiement</button>
+          </form>
+        </div>
+      )}
     </div>
   );
 }
