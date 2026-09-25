@@ -50,9 +50,6 @@ export async function approveExpense(formData: FormData) {
   const { data: school } = await supabase.from('schools').select('id').single();
   if (!school) throw new Error('Établissement introuvable pour ce compte.');
 
-  // RLS (expense_approval_director_only) refuse cet insert si le compte
-  // connecté ne porte pas le rôle Directeur — indépendamment de ce que
-  // montre l'écran.
   const { error: approvalError } = await supabase.from('expense_approvals').insert({
     school_id: school.id, expense_id, approver_id: auth.user?.id, decision: 'approved'
   });
@@ -92,8 +89,6 @@ export async function payExpense(formData: FormData) {
     throw new Error('Choisissez une caisse ou un compte bancaire pour payer cette dépense.');
   }
 
-  // process_expense_payment() enchaîne trésorerie -> écriture comptable ->
-  // statut comptabilisée en une seule transaction (0006_comptabilite_seed.sql §B).
   const { error } = await supabase.rpc('process_expense_payment', {
     p_expense_id: expense_id,
     p_cash_session_id: cash_session_id,
@@ -101,5 +96,24 @@ export async function payExpense(formData: FormData) {
   });
 
   if (error) throw new Error(`Impossible de payer cette dépense : ${error.message}`);
+  revalidatePath(`/dashboard/depenses/${expense_id}`);
+}
+
+// Annulation tracée d'une dépense déjà payée — jamais de suppression.
+export async function cancelExpense(formData: FormData) {
+  const supabase = createClient();
+  const expense_id = String(formData.get('expense_id'));
+  const reason = String(formData.get('reason'));
+
+  if (!reason || reason.trim().length < 3) {
+    throw new Error('Le motif d\'annulation est obligatoire.');
+  }
+
+  const { error } = await supabase.rpc('process_expense_cancellation', {
+    p_expense_id: expense_id,
+    p_reason: reason
+  });
+
+  if (error) throw new Error(`Impossible d'annuler cette dépense : ${error.message}`);
   revalidatePath(`/dashboard/depenses/${expense_id}`);
 }
