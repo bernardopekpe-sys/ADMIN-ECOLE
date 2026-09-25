@@ -1,6 +1,7 @@
 'use server';
 
 import { redirect } from 'next/navigation';
+import { revalidatePath } from 'next/cache';
 import { createClient } from '@/lib/supabase/server';
 import { amountToWordsFr } from '@/lib/num-to-words';
 
@@ -17,7 +18,6 @@ export async function createPayment(formData: FormData) {
   const payment_method = String(formData.get('payment_method'));
   const cash_session_id = String(formData.get('cash_session_id') ?? '') || null;
 
-  // Récupère l'allocation par tranche depuis les champs allocation_<installment_id>
   const allocations: { installment_id: string; amount: number }[] = [];
   for (const [key, value] of formData.entries()) {
     if (key.startsWith('allocation_')) {
@@ -34,7 +34,6 @@ export async function createPayment(formData: FormData) {
 
   const totalAmount = allocations.reduce((sum, a) => sum + a.amount, 0);
 
-  // 1. Résout la caisse ouverte correspondante (cash_session_id -> cash_register_id)
   let cash_register_id: string | null = null;
   if (cash_session_id) {
     const { data: session } = await supabase
@@ -45,7 +44,6 @@ export async function createPayment(formData: FormData) {
     cash_register_id = session?.cash_register_id ?? null;
   }
 
-  // 2. Numérotation atomique + création du paiement
   const year = new Date().getFullYear();
   const { data: paymentNumber, error: numError } = await supabase.rpc('get_next_number', {
     p_school_id: school.id, p_document_type: 'payment', p_year: year
@@ -72,7 +70,6 @@ export async function createPayment(formData: FormData) {
     throw new Error(`Impossible d'enregistrer le paiement : ${paymentError.message}`);
   }
 
-  // 3. Ventilation sur les tranches choisies
   const { error: allocError } = await supabase.from('payment_allocations').insert(
     allocations.map((a) => ({
       school_id: school.id,
@@ -85,8 +82,6 @@ export async function createPayment(formData: FormData) {
     throw new Error(`Paiement créé mais échec de la ventilation : ${allocError.message}`);
   }
 
-  // 4. Propagation complète : reçu -> caisse/banque -> comptabilité -> échéancier
-  //    (process_student_payment, voir 02-rls-et-fonctions.sql §D.3)
   const { error: processError } = await supabase.rpc('process_student_payment', {
     p_payment_id: payment.id
   });
@@ -94,13 +89,31 @@ export async function createPayment(formData: FormData) {
     throw new Error(`Paiement enregistré mais échec de la propagation comptable : ${processError.message}`);
   }
 
-  // process_student_payment() a créé le reçu avec amount_in_words vide
-  // (généré côté application, cf. commentaire dans 02-rls-et-fonctions.sql) —
-  // on le complète ici.
   await supabase
     .from('receipts')
     .update({ amount_in_words: amountToWordsFr(totalAmount) })
     .eq('payment_id', payment.id);
 
   redirect(`/dashboard/paiements/${payment.id}`);
+}
+
+// Annulation tracée — jamais de suppression. Réservée aux rôles avec le
+// droit "paiements/annuler" (RLS + permission), typiquement le Directeur.
+export async function cancelPayment(formData: FormData) {
+  const supabase = createClient();
+  const payment_id = String(formData.get('payment_id'));
+  const reason = String(formData.get('reason'));
+
+  if (!reason || reason.trim().length < 3) {
+    throw new Error('Le motif d\'annulation est obligatoire.');
+  }
+
+  const { error } = await supabase.rpc('process_payment_cancellation', {
+    p_payment_id: payment_id,
+    p_reason: reason
+  });
+
+  if (error) throw new Error(`Impossible d'annuler ce paiement : ${error.message}`);
+
+  revalidatePath(`/dashboard/paiements/${payment_id}`);
 }
