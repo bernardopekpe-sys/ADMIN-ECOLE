@@ -1,5 +1,5 @@
 import { createClient } from '@/lib/supabase/server';
-import { submitExpense, approveExpense, rejectExpense, payExpense } from '../actions';
+import { submitExpense, approveExpense, rejectExpense, payExpense, cancelExpense } from '../actions';
 
 export default async function FicheDepensePage({ params }: { params: { id: string } }) {
   const supabase = createClient();
@@ -23,9 +23,6 @@ export default async function FicheDepensePage({ params }: { params: { id: strin
 
   if (!expense) return <div className="page"><div className="error-box">Dépense introuvable.</div></div>;
 
-  const steps = ['brouillon', 'soumise', 'validee', 'payee', 'comptabilisee'];
-  const currentIndex = expense.status === 'rejetee' ? -1 : steps.indexOf(expense.status);
-
   return (
     <div className="page">
       <div className="page-head">
@@ -36,6 +33,7 @@ export default async function FicheDepensePage({ params }: { params: { id: strin
       </div>
 
       {expense.status === 'rejetee' && <div className="error-box">Cette dépense a été rejetée.</div>}
+      {expense.status === 'annulee' && <div className="error-box">Cette dépense a été annulée. {expense.notes}</div>}
 
       <div className="grid-2">
         <div className="panel">
@@ -71,10 +69,6 @@ export default async function FicheDepensePage({ params }: { params: { id: strin
                   <button type="submit" className="btn ghost">Rejeter</button>
                 </form>
               </div>
-              <div className="hint" style={{ marginTop: 10 }}>
-                Note : ce bouton n&apos;est bloqué par la RLS que si votre compte porte le rôle Directeur
-                (policy <code>expense_approval_director_only</code>) — l&apos;affichage seul ne suffit pas à sécuriser l&apos;action.
-              </div>
             </div>
           )}
 
@@ -98,6 +92,23 @@ export default async function FicheDepensePage({ params }: { params: { id: strin
                   </select>
                 </div>
                 <button type="submit" className="btn primary">Payer</button>
+              </form>
+            </div>
+          )}
+
+          {(expense.status === 'payee' || expense.status === 'comptabilisee') && (
+            <div className="panel" style={{ marginTop: 16, background: 'var(--bg)' }}>
+              <h3>Annuler cette dépense</h3>
+              <div className="hint" style={{ marginBottom: 10 }}>
+                Génère une écriture comptable inverse. La dépense originale reste visible dans l&apos;historique.
+              </div>
+              <form action={cancelExpense}>
+                <input type="hidden" name="expense_id" value={expense.id} />
+                <div className="f-item" style={{ marginBottom: 10 }}>
+                  <label htmlFor="reason">Motif de l&apos;annulation</label>
+                  <input id="reason" name="reason" required />
+                </div>
+                <button type="submit" className="btn danger">Annuler la dépense</button>
               </form>
             </div>
           )}
