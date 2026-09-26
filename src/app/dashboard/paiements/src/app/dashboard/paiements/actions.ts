@@ -12,7 +12,10 @@ export async function createPayment(formData: FormData) {
   if (!school) throw new Error('Établissement introuvable pour ce compte.');
   const { data: auth } = await supabase.auth.getUser();
 
-  const student_id = String(formData.get('student_id'));
+  // primary_student_id : premier enfant concerné, gardé pour compatibilité
+  // d'affichage — le détail réel (potentiellement plusieurs enfants) vit
+  // dans payment_allocations, ventilé tranche par tranche.
+  const primary_student_id = String(formData.get('primary_student_id') ?? '') || null;
   const guardian_id = String(formData.get('guardian_id') ?? '') || null;
   const payer_name = String(formData.get('payer_name') ?? '') || null;
   const payment_method = String(formData.get('payment_method'));
@@ -55,7 +58,7 @@ export async function createPayment(formData: FormData) {
     .insert({
       school_id: school.id,
       payment_number: paymentNumber,
-      student_id,
+      student_id: primary_student_id,
       guardian_id,
       payer_name,
       amount: totalAmount,
